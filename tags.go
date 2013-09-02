@@ -8,6 +8,7 @@ import (
   "encoding/csv"
   "strings"
   "regexp"
+  "time"
 )
 
 type sortedMap struct {
@@ -45,7 +46,7 @@ var tagMap map[string]int
 
 func getTagListFromTrainData() {
   //An artificial input source.
-  f, err := os.Open("./Train.csv")
+  f, err := os.Open("/vol/Train.csv")
   if err != nil {
     fmt.Printf("error opening file: %v\n",err)
     os.Exit(1)
@@ -58,6 +59,8 @@ func getTagListFromTrainData() {
 
   //specialPattern := regexp.MustCompile("(\\]|\\[|^\\$|\\.|\\||\\?|\\*|\\+|\\(|\\))")
 
+  startTime := time.Now()
+
   for i :=0 ; slices != nil ; slices, _ = r.Read() {
     tags := strings.Split(slices[3]," ")
     for _, tag := range tags {
@@ -68,22 +71,9 @@ func getTagListFromTrainData() {
         tagMap[tag]= 1
       }
 
-      /*
-      escapedTag := specialPattern.ReplaceAllString(tag,"\\${1}")
-
-      tagPattern := regexp.MustCompile(escapedTag)
-
-      if tagPattern.MatchString(strings.ToLower(slices[1])) {
-        //fmt.Println("Matches tag on title:" , tag)
-      }
-
-      if tagPattern.MatchString(strings.ToLower(slices[2])) {
-        //fmt.Println("Matches tag on body:" , tag)
-      }
-      */
     }
-    if i % 100000  == 0 {
-      fmt.Println(slices[0])
+    if i % 10000  == 0 {
+        fmt.Println("tag N:", slices[0], " Elapsed time:",time.Since(startTime))
     }
     i=i+1
   }
@@ -155,6 +145,8 @@ func makePredictionOnTestData(tagSlice []string) {
 
   specialPattern := regexp.MustCompile("(\\]|\\[|^\\$|\\.|\\||\\?|\\*|\\+|\\(|\\))")
 
+  startTime := time.Now()
+
   for i :=0 ; slices != nil ; slices, _ = r.Read() {
 
     numMatches := 0
@@ -182,7 +174,7 @@ func makePredictionOnTestData(tagSlice []string) {
     }
     i=i+1
     if i % 10000  == 0 {
-      fmt.Println(slices[0])
+        fmt.Println("tag N:", slices[0], " Elapsed time:",time.Since(startTime))
     }
     //fmt.Println("Matching tags:", matches, "with title", slices[1])
     if _, err := fo.Write([]byte(slices[0]+",\""+matches+"\"\n")); err != nil {
@@ -193,6 +185,9 @@ func makePredictionOnTestData(tagSlice []string) {
 }
 
 func main() {
-  tagSlice:= loadTagList()
-  makePredictionOnTestData(tagSlice)
+  //tagSlice:= loadTagList()
+  //makePredictionOnTestData(tagSlice)
+  startTime := time.Now()
+  getTagListFromTrainData()
+  fmt.Println("Elapsed time", time.Since(startTime))
 }
