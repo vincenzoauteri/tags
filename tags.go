@@ -4,6 +4,7 @@ import (
   "sort"
   "fmt"
   "os"
+  "bufio"
   "encoding/csv"
   "strings"
   "regexp"
@@ -42,7 +43,7 @@ func sortedKeys(m map[string]int) []string {
 
 var tagMap map[string]int
 
-func main() {
+func getTagListFromTrainData() {
   //An artificial input source.
   f, err := os.Open("./Train.csv")
   if err != nil {
@@ -55,6 +56,8 @@ func main() {
 
   tagMap = make(map[string]int)
 
+  //specialPattern := regexp.MustCompile("(\\]|\\[|^\\$|\\.|\\||\\?|\\*|\\+|\\(|\\))")
+
   for i :=0 ; slices != nil ; slices, _ = r.Read() {
     tags := strings.Split(slices[3]," ")
     for _, tag := range tags {
@@ -65,7 +68,7 @@ func main() {
         tagMap[tag]= 1
       }
 
-      specialPattern := regexp.MustCompile("(\\]|\\[|^\\$|\\.|\\||\\?|\\*|\\+|\\(|\\))")
+      /*
       escapedTag := specialPattern.ReplaceAllString(tag,"\\${1}")
 
       tagPattern := regexp.MustCompile(escapedTag)
@@ -77,19 +80,119 @@ func main() {
       if tagPattern.MatchString(strings.ToLower(slices[2])) {
         //fmt.Println("Matches tag on body:" , tag)
       }
+      */
     }
-    i=i+1
-    if i % 100000  == 0{
+    if i % 100000  == 0 {
       fmt.Println(slices[0])
     }
+    i=i+1
   }
   fmt.Println(sortedKeys(tagMap))
 
-  // Set the split function for the scanning operation.
-  //scanner.Split(bufio.ScanWords)
-  // Count the words.
-  //if err := scanner.Err(); err != nil {
-  //  fmt.Fprintln(os.Stderr, "reading input:", err)
-  //}
-  //fmt.Printf("%d\n", count)
+  //open output file
+  fo, err := os.Create("trainTags.txt")
+  if err != nil { panic(err) }
+  // close fo on exit and check for its returned error
+  defer func() {
+    if err := fo.Close(); err != nil {
+      panic(err)
+    }
+  }()
+
+  if _, err := fo.Write([]byte(strings.Join(sortedKeys(tagMap)," "))); err != nil {
+    panic(err)
+  }
+}
+
+func loadTagList() []string {
+  f, err := os.Open("./trainTags.txt")
+
+  if err != nil {
+    fmt.Printf("error opening file: %v\n",err)
+    os.Exit(1)
+  }
+  /*
+  scanner := bufio.NewScanner(f)
+
+  for scanner.Scan() {
+    fmt.Println(scanner.Bytes())
+  }
+  */
+  scanner := bufio.NewReader(f)
+
+  s,_ := scanner.ReadString('\n')
+
+  return strings.Split(s," ")
+}
+
+func makePredictionOnTestData(tagSlice []string) {
+  f, err := os.Open("./Test.csv")
+  if err != nil {
+    fmt.Printf("error opening file: %v\n",err)
+    os.Exit(1)
+  }
+
+  //open output file
+  fo, err := os.Create("Submission.txt")
+  if err != nil { panic(err) }
+  // close fo on exit and check for its returned error
+  defer func() {
+    if err := fo.Close(); err != nil {
+      panic(err)
+    }
+  }()
+  
+  if _, err := fo.Write([]byte("\"Id\",\"Tags\"\n")); err != nil {
+    panic(err)
+  }
+
+  r := csv.NewReader(f)
+
+  //Skip header
+  slices, _ := r.Read()
+
+  slices, _ = r.Read()
+
+  specialPattern := regexp.MustCompile("(\\]|\\[|^\\$|\\.|\\||\\?|\\*|\\+|\\(|\\))")
+
+  for i :=0 ; slices != nil ; slices, _ = r.Read() {
+
+    numMatches := 0
+    matches := ""
+    for _, tag := range tagSlice {
+
+      tagChunks := strings.Split(tag,"-")
+      match := true
+      for _, tagChunk := range tagChunks{
+
+        escapedTagChunk := specialPattern.ReplaceAllString(tagChunk,"\\${1}")
+        tagChunkPattern := regexp.MustCompile("\\W" + escapedTagChunk + "\\W")
+
+        if !tagChunkPattern.MatchString(strings.ToLower(slices[1]))  && !tagChunkPattern.MatchString(strings.ToLower(slices[2])) {
+          match = false
+        }
+      }
+      if match {
+        numMatches = numMatches + 1
+        matches = matches + tag + " "
+        if numMatches >=2 {
+          break
+        }
+      }
+    }
+    i=i+1
+    if i % 10000  == 0 {
+      fmt.Println(slices[0])
+    }
+    //fmt.Println("Matching tags:", matches, "with title", slices[1])
+    if _, err := fo.Write([]byte(slices[0]+",\""+matches+"\"\n")); err != nil {
+      panic(err)
+    }
+  }
+
+}
+
+func main() {
+  tagSlice:= loadTagList()
+  makePredictionOnTestData(tagSlice)
 }
